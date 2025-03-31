@@ -3,6 +3,7 @@
 
 from _G import type, error, assert, print, tostring, ipairs, io, os, debug, table, string, getmetatable, setmetatable
 
+const { getinfo: debug_getinfo, getlocal: debug_getlocal } = debug
 
 import "pretty.util"
 
@@ -155,8 +156,44 @@ renderers.string = (value, options={}) ->
 	set_color({ fg: "reset" }, options)
 
 
+const get_parameter_names = (f) ->
+	const result = []
+
+	local i = 0
+	while true
+		i += 1
+
+		const name = debug_getlocal(f, i)
+
+		if name == nil
+			break
+
+		result[] = name
+
+	if debug_getinfo(f).isvararg
+		result[] = "..."
+
+	result
+
+
 renderers.function = (value, options={}) ->
-	tostring(value)
+	const info = debug_getinfo(value)
+
+	const { :nparams, :isvararg, :name } = info
+
+	const address = "%p"::format(value)
+
+	set_color({ fg: "magenta" }, options) ..
+	"function" ..
+	set_color({ fg: "reset" }, options) .. (if name?
+		" " ..
+		name
+	else
+		""
+	) ..
+	"(" ..
+	table.concat(get_parameter_names(value), ", ") ..
+	")"
 
 
 renderers.thread = (value, options={}) ->
