@@ -1,0 +1,63 @@
+#!/usr/bin/env yue
+--- SPDX-License-Identifier: 0BSD
+
+from _G import type, error, assert, print, tostring, ipairs, io, os, debug, table, string, getmetatable, setmetatable
+
+
+export check_arguments = (func_name, arguments) ->
+	for arg in *arguments
+		const [index, name, expected_type, value] = arg
+
+		const type_of_value = type(value)
+
+		if type_of_value == expected_type
+			continue
+
+		error("Wrong type of argument #%d %q to function %q! (expected %s, got: %s)"::format(
+			index,
+			name,
+			func_name,
+			expected_type,
+			type_of_value,
+		))
+
+
+export unpack = table.unpack ?? _G.unpack
+
+
+export pack = (...) ->
+	with { ... }
+		.n = select("#", ...)
+
+
+export split = (str, delimiter_pattern="%s+") ->
+	check_arguments("pretty.util.split", [
+		[1, "str",               "string", str],
+		[2, "delimiter_pattern", "string", delimiter_pattern],
+	])
+
+	assert(
+		delimiter_pattern != "",
+		"The delimiter pattern must not be an empty string!",
+	)
+
+	const result = []
+
+	local last_match_end = 0
+	for match, i in str::gmatch("(.-)" .. delimiter_pattern .. "()")
+		last_match_end = i
+		result[] = match
+
+	result[] = str::sub(last_match_end)
+
+	result
+
+
+export main = (argv=arg) ->
+	const test_string = "foo bar biz  baz"
+	for k, v in ipairs(split(test_string, " "))
+		print(k, "%q"::format(v))
+
+
+if select("#", ...) == 0
+	os.exit(main())

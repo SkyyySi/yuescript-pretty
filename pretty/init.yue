@@ -1,0 +1,15 @@
+#!/usr/bin/env yue
+--- SPDX-License-Identifier: 0BSD
+
+from _G import type, error, assert, print, tostring, ipairs, io, os, debug, table, string, getmetatable, setmetatable
+
+
+export util = require("pretty.util")
+
+
+export main = (argv=arg) ->
+	print("Hello, world!")
+
+
+if select("#", ...) == 0
+	os.exit(main())
