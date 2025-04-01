@@ -141,6 +141,12 @@ export reset = (colors={}, options={}) ->
 	)
 
 
+export with_string = (str, colors, options) ->
+	set(colors, options) ..
+	str ..
+	reset(colors, options)
+
+
 export main = (argv=arg) ->
 	print("#{$FILE} :: main() :: #{$LINE}")
 

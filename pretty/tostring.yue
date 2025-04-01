@@ -15,9 +15,7 @@ export renderers = {}
 renderers.nil = (value, options={}) ->
 	options.nil_base_color ??= { fg: "red", effects: { italic: true } }
 
-	color.set(options.nil_base_color, options) ..
-	"nil" ..
-	color.reset(options.nil_base_color, options)
+	color.with_string("nil", options.nil_base_color, options)
 
 
 renderers.boolean = (value, options={}) ->
@@ -30,9 +28,7 @@ renderers.boolean = (value, options={}) ->
 	else
 		"false", options.boolean_false_base_color
 
-	color.set(this_color, options) ..
-	this_str ..
-	color.reset(this_color, options)
+	color.with_string(this_str, this_color, options)
 
 
 renderers.number = (value, options={}) ->
@@ -72,23 +68,43 @@ const get_parameter_names = (f) ->
 
 
 renderers.function = (value, options={}) ->
+	options.function_keyword_color ??= { fg: "magenta" }
+	options.function_name_color ??= {}
+	options.function_parenthesis_color ??= {}
+	options.function_opening_parenthesis_color ??= options.function_parenthesis_color ?? {}
+	options.function_closinging_parenthesis_color ??= options.function_parenthesis_color ?? {}
+	options.function_parameter_name_color ??= {}
+	options.function_parameter_delimiter_color ??= {}
+
 	const info = debug_getinfo(value)
 
 	const { :nparams, :isvararg, :name } = info
 
 	const address = "%p"::format(value)
 
-	color.set({ fg: "magenta" }, options) ..
+	color.set(options.function_keyword_color, options) ..
 	"function" ..
-	color.set({ fg: "reset" }, options) .. (if name?
+	color.reset(options.function_keyword_color, options) ..
+	(if name?
 		" " ..
-		name
+		color.set(options.function_name_color) ..
+		name ..
+		color.reset(options.function_name_color)
 	else
 		""
 	) ..
+	color.set(options.function_opening_parenthesis_color, options) ..
 	"(" ..
-	table.concat(get_parameter_names(value), ", ") ..
-	")"
+	color.reset(options.function_opening_parenthesis_color, options) ..
+	table.concat(
+		[color.set(options.function_parameter_name_color, options) .. name .. color.reset(options.function_parameter_name_color, options) for name in *get_parameter_names(value)],
+		color.set(options.function_parameter_delimiter_color, options) ..
+		", " ..
+		color.reset(options.function_parameter_delimiter_color, options),
+	) ..
+	color.set(options.function_closing_parenthesis_color, options) ..
+	")" ..
+	color.reset(options.function_closing_parenthesis_color, options)
 
 
 renderers.thread = (value, options={}) ->
