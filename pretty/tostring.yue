@@ -152,7 +152,8 @@ renderers.number = (value, options={}) ->
 
 renderers.string = (value, options={}) ->
 	set_color({ fg: "yellow" }, options) ..
-	"%q"::format(value) ..
+	--"%q"::format(value) ..
+	util.quote(value) ..
 	set_color({ fg: "reset" }, options)
 
 

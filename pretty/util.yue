@@ -53,10 +53,39 @@ export split = (str, delimiter_pattern="%s+") ->
 	result
 
 
+export quote = (str) ->
+	check_arguments("pretty.util.quote", [
+		[1, "str", "string", str],
+	])
+
+	const quote_char = if str::find('"') and not str::find("'")
+		"'"
+	else
+		'"'
+
+	quote_char .. str::gsub("[%z\001-\031\127-\255]", (char) ->
+		if named_escape := ({
+			"\a": "\\a",
+			"\b": "\\b",
+			"\f": "\\f",
+			"\n": "\\n",
+			"\r": "\\r",
+			"\t": "\\t",
+			"\v": "\\v",
+		})[char]
+			return named_escape
+
+		"\\%03d"::format(char::byte())
+	) .. quote_char
+
+
 export main = (argv=arg) ->
-	const test_string = "foo bar biz  baz"
-	for k, v in ipairs(split(test_string, " "))
+	const test_string_1 = "foo bar biz  baz"
+	for k, v in ipairs(split(test_string_1, " "))
 		print(k, "%q"::format(v))
+
+	const test_string_2 = table.concat([string.char(i) for i = 0, 255])
+	print(quote(test_string_2))
 
 
 if select("#", ...) == 0
