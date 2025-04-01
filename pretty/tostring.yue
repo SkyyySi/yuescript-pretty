@@ -12,6 +12,10 @@ import "pretty.color"
 export renderers = {}
 
 
+export render = (value, options) ->
+	renderers[type(value)](value, options)
+
+
 renderers.nil = (value, options={}) ->
 	with options
 		.nil_base_color ??= { fg: "red", effects: { italic: true } }
@@ -77,35 +81,23 @@ renderers.function = (value, options={}) ->
 		.function_parameter_name_color ??= {}
 		.function_parameter_delimiter_color ??= {}
 
-	const info = debug_getinfo(value)
+	const apply_color = (str, color_identifier) ->
+		color.with_string(str, options["function_" .. color_identifier], options)
 
-	const { :nparams, :isvararg, :name } = info
+	const { :nparams, :isvararg, :name } = debug_getinfo(value)
 
-	const address = "%p"::format(value)
+	--- Only works in Lua 5.2 and onwards as well as LuaJIT, but not in Lua 5.1
+	const has_address, address = pcall(((f) -> "%p"::format(f)), f)
 
-	color.set(options.function_keyword_color, options) ..
-	"function" ..
-	color.reset(options.function_keyword_color, options) ..
-	(if name?
-		" " ..
-		color.set(options.function_name_color) ..
-		name ..
-		color.reset(options.function_name_color)
-	else
-		""
-	) ..
-	color.set(options.function_opening_parenthesis_color, options) ..
-	"(" ..
-	color.reset(options.function_opening_parenthesis_color, options) ..
+	apply_color("function", "keyword_color") ..
+	(name? and " " .. apply_color(name, "name_color") or "") ..
+	apply_color("(", "opening_parenthesis_color") ..
 	table.concat(
-		[color.set(options.function_parameter_name_color, options) .. name .. color.reset(options.function_parameter_name_color, options) for name in *get_parameter_names(value)],
-		color.set(options.function_parameter_delimiter_color, options) ..
-		", " ..
-		color.reset(options.function_parameter_delimiter_color, options),
+		[apply_color(name, "parameter_name_color") for name in *get_parameter_names(value)],
+		(apply_color(",", "parameter_delimiter_color") .. " "),
 	) ..
-	color.set(options.function_closing_parenthesis_color, options) ..
-	")" ..
-	color.reset(options.function_closing_parenthesis_color, options)
+	apply_color(")", "closing_parenthesis_color") ..
+	(has_address and " at %p"::format(value) or "")
 
 
 renderers.thread = (value, options={}) ->
@@ -120,15 +112,53 @@ renderers.cdata = (value, options={}) ->
 	tostring(value)
 
 
+const table_is_array = (tb) ->
+	const length = #tb
+
+	local last_key = 0
+	local count = 0
+	for k, v in pairs(tb)
+		if type(k) != "number"
+			return false
+
+		if k != (last_key + 1)
+			return false
+
+		last_key = k
+		count += 1
+
+	count == length
+
+
 renderers.table = (value, options={}) ->
 	with options
 		.depth ??= 0
 
-	tostring(value)
+	if next(value, nil) == nil
+		return "{}"
 
+	const is_array = table_is_array(value)
+	const depth = options.depth
+	const indent = "    "::rep(depth)
+	const child_indent = indent .. "    "
 
-export render = (value, options) ->
-	renderers[type(value)](value, options)
+	options.depth += 1
+
+	local result = is_array and "[\n" or "{\n"
+
+	for k, v in pairs(value)
+		result ..= (
+			child_indent ..
+			(is_array and "" or ("[" .. render(k, options) .. "]: ")) ..
+			render(v, options) ..
+			(next(value, k) == nil and "\n" or ",\n")
+		)
+
+	result ..= indent .. (is_array and "]" or "}")
+
+	options.depth -= 1
+
+	result
 
 
 export.<call> = (...) =>
