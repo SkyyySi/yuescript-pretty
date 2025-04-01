@@ -12,7 +12,7 @@ import "pretty.color"
 export renderers = {}
 
 
-export render = (value, options) ->
+export render = (value, options={}) ->
 	renderers[type(value)](value, options)
 
 
@@ -133,14 +133,31 @@ const table_is_array = (tb) ->
 renderers.table = (value, options={}) ->
 	with options
 		.depth ??= 0
+		.get_indent ??= (depth) ->
+			if depth < 0
+				error("Invalid block depth (expected >= 0, got: #{depth})")
+			elseif depth == 0
+				""
+			elseif depth == 1
+				"    "
+			else
+				"    " .. table.concat(["\027[2;3#{((i - 1) % 8)+ 1}m│\027[22;39m   " for i = 2, depth])
+		.indent_cache ??= []
 
 	if next(value, nil) == nil
 		return "{}"
 
 	const is_array = table_is_array(value)
 	const depth = options.depth
-	const indent = "    "::rep(depth)
-	const child_indent = indent .. "    "
+	const get_indent_cached = (depth) ->
+		if cached := options.indent_cache[depth]
+			cached
+		else
+			const temp = options.get_indent(depth)
+			options.indent_cache[depth] = temp
+			temp
+	const indent = get_indent_cached(depth)
+	const child_indent = get_indent_cached(depth + 1)
 
 	options.depth += 1
 
