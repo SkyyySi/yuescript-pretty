@@ -3,6 +3,8 @@
 
 from _G import type, error, assert, print, tostring, ipairs, io, os, debug, table, string, getmetatable, setmetatable
 
+import "pretty.color"
+
 
 export check_arguments = (func_name, arguments) ->
 	for arg in *arguments
@@ -53,7 +55,50 @@ export split = (str, delimiter_pattern="%s+") ->
 	result
 
 
-export quote = (str) ->
+-- https://en.wikipedia.org/wiki/Control_Pictures
+const unicode_control_pictures = do
+	const temp = string.char(226) .. string.char(144)
+	{ string.char(i), temp .. string.char(i + 128) for i = 0, 31 }
+
+const named_escapes = {
+	"\\": "\\\\",
+	"\a": "\\a",
+	"\b": "\\b",
+	"\027": "\\e",
+	"\f": "\\f",
+	"\n": "\\n",
+	"\r": "\\r",
+	"\t": "\\t",
+	"\v": "\\v",
+	"\"": "\\\"",
+	"\'": "\\\'",
+}
+
+const decimal_escapes = { string.char(i), "\\%03d"::format(i) for i = 0, 255 }
+
+const hexadecimal_escapes = { string.char(i), "\\x%02X"::format(i) for i = 0, 255 }
+
+const unmapped_characters = do
+	const temp = { string.char(i), string.char(i) for i = 32, 126 }
+	temp["\\"] = "\\"
+	temp["\027"] = "\027"
+	temp
+
+const quote_char_map = {
+	--...decimal_escapes,
+	...hexadecimal_escapes,
+	...unicode_control_pictures,
+	...unmapped_characters,
+	...named_escapes,
+}
+
+
+export quote = (str, options={}) ->
+	options.quote_char_map ??= quote_char_map
+	options.quote_escape_highlighter ??= (escape) ->
+		"\027[1;7m" .. escape .. "\027[22;27m"
+	options.quote_string_base_color ??= options.string_base_color ?? { fg: "yellow" }
+
 	check_arguments("pretty.util.quote", [
 		[1, "str", "string", str],
 	])
@@ -63,29 +108,40 @@ export quote = (str) ->
 	else
 		'"'
 
-	quote_char .. str::gsub("[%z\001-\031\127-\255]", (char) ->
-		if named_escape := ({
-			"\a": "\\a",
-			"\b": "\\b",
-			"\f": "\\f",
-			"\n": "\\n",
-			"\r": "\\r",
-			"\t": "\\t",
-			"\v": "\\v",
-		})[char]
-			return named_escape
+	local skip_until_pos = nil
+	color.set(options.quote_string_base_color, options) ..
+	quote_char ..
+	str::gsub(
+		"()([%z\001-\255])",
+		(pos, char) ->
+			const mapped_char = options.quote_char_map[char] ?? char
 
-		"\\%03d"::format(char::byte())
-	) .. quote_char
+			return if skip_until_pos?
+				if pos < skip_until_pos
+					mapped_char
+				else
+					skip_until_pos = nil
+					"\027[0m" .. mapped_char
+			elseif ansi_color_escape := str::sub(pos)::match("^\027%[[0-9;]-m")
+				skip_until_pos = pos + #ansi_color_escape
+				"\027[0m#{ansi_color_escape}\\e"
+			elseif mapped_char == char
+				char
+			else
+				options.quote_escape_highlighter(mapped_char)
+	) ..
+	color.set(options.quote_string_base_color, options) ..
+	quote_char
 
 
 export main = (argv=arg) ->
-	const test_string_1 = "foo bar biz  baz"
-	for k, v in ipairs(split(test_string_1, " "))
-		print(k, "%q"::format(v))
+	--const test_string_1 = "foo bar biz  baz"
+	--for k, v in ipairs(split(test_string_1, " "))
+	--	print(k, "%q"::format(v))
 
-	const test_string_2 = table.concat([string.char(i) for i = 0, 255])
-	print(quote(test_string_2))
+	const test_string_2 = table.concat([string.char(i) for i = 0, 255]) ..
+		"\027[1;31;45mColor test\027[0m"
+	print("\027[0m" .. quote(test_string_2) .. "\027[0m")
 
 
 if select("#", ...) == 0

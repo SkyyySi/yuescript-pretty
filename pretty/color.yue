@@ -1,0 +1,149 @@
+#!/usr/bin/env yue
+--- SPDX-License-Identifier: 0BSD
+
+from _G import type, error, assert, print, tostring, ipairs, io, os, debug, table, string, getmetatable, setmetatable
+
+
+const ansi_codes = {
+	bg: {
+		reset: "\027[49m",
+
+		black:      "\027[40m",
+		red:        "\027[41m",
+		green:      "\027[42m",
+		yellow:     "\027[43m",
+		blue:       "\027[44m",
+		magenta:    "\027[45m",
+		cyan:       "\027[46m",
+		light_grey: "\027[47m",
+
+		dark_grey:     "\027[100m",
+		light_red:     "\027[101m",
+		light_green:   "\027[102m",
+		light_yellow:  "\027[103m",
+		light_blue:    "\027[104m",
+		light_magenta: "\027[105m",
+		light_cyan:    "\027[106m",
+		white:         "\027[107m",
+
+		format_256_color: "\027[39;5;%d;m",
+		format_truecolor: "\027[39;2;%d;%d;%d;m",
+	},
+	fg: {
+		reset: "\027[39m",
+
+		black:      "\027[30m",
+		red:        "\027[31m",
+		green:      "\027[32m",
+		yellow:     "\027[33m",
+		blue:       "\027[34m",
+		magenta:    "\027[35m",
+		cyan:       "\027[36m",
+		light_grey: "\027[37m",
+
+		dark_grey:     "\027[90m",
+		light_red:     "\027[91m",
+		light_green:   "\027[92m",
+		light_yellow:  "\027[93m",
+		light_blue:    "\027[94m",
+		light_magenta: "\027[95m",
+		light_cyan:    "\027[96m",
+		white:         "\027[97m",
+
+		format_256_color: "\027[38;5;%d;m",
+		format_truecolor: "\027[38;2;%d;%d;%d;m",
+	},
+	effects: {
+		reset: "\027[0m",
+
+		strong:     "\027[1m",
+		strong_off: "\027[22m",
+
+		weak:     "\027[2m",
+		weak_off: "\027[22m",
+
+		italic:     "\027[3m",
+		italic_off: "\027[23m",
+
+		underline:     "\027[4m",
+		underline_off: "\027[24m",
+
+		blink:     "\027[5m",
+		blink_off: "\027[25m",
+
+		invert:     "\027[7m",
+		invert_off: "\027[27m",
+
+		invisible:     "\027[8m",
+		invisible_off: "\027[28m",
+
+		strikethrough:     "\027[9m",
+		strikethrough_off: "\027[29m",
+	},
+}
+
+
+export set = (colors={}, options={}) ->
+	options.output_format ??= "ansi"
+
+	switch options.output_format
+		when "ansi"
+			--
+		else
+			error("Unsupported output format %q!"::format(options.output_format))
+
+	const { :fg, :bg, :effects } = colors
+
+	const ansi_color_helper = (color, kind) ->
+		switch type(color)
+			when "nil"
+				""
+			when "string"
+				if ansi_code := ansi_codes[kind][color]
+					-- Interpret as a named ANSI color code
+					ansi_code
+				elseif color::find("^\027%[[0-9;]-m$")
+					-- Interpret as a raw ANSI escape sequence
+					color
+			when "number"
+				assert(0 <= color <= 255)
+				-- Interpret as an XTerm 256 color code
+				ansi_codes[kind].format_256_color::format(color)
+			when "table"
+				const red   = color[1] or color.r or color.red
+				const green = color[2] or color.g or color.green
+				const blue  = color[3] or color.b or color.blue
+
+				-- Interpret as an RGB / truecolor table
+				ansi_codes[kind].format_truecolor::format(red, green, blue)
+
+	const effect_ansi_codes = if type(effects) == "string"
+		[ansi_codes.effects[effects],]
+	elseif effects?
+		for k, v in pairs(effects)
+			switch type(k)
+				when "string"
+					ansi_codes.effects[v and k or k .. "_off"]
+				when "number"
+					ansi_codes.effects[v]
+	else
+		[]
+
+	ansi_color_helper(fg, "fg") ..
+	ansi_color_helper(bg, "bg") ..
+	table.concat(effect_ansi_codes)
+
+
+export reset = (colors={}, options={}) ->
+	set(
+		{ k, "reset" for k, v in pairs(colors) },
+		options,
+	)
+
+
+export main = (argv=arg) ->
+	print("#{$FILE} :: main() :: #{$LINE}")
+
+
+if select("#", ...) == 0
+	os.exit(main())
