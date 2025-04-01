@@ -83,6 +83,12 @@ const ansi_codes = {
 }
 
 
+export class Color
+	new: () =>
+
+	apply: (str) =>
+
+
 export set = (colors={}, options={}) ->
 	options.output_format ??= "ansi"
 
@@ -94,12 +100,12 @@ export set = (colors={}, options={}) ->
 
 	const { :fg, :bg, :effects } = colors
 
-	const ansi_color_helper = (color, kind) ->
+	const ansi_color_helper = (color, layer) ->
 		switch type(color)
 			when "nil"
 				""
 			when "string"
-				if ansi_code := ansi_codes[kind][color]
+				if ansi_code := ansi_codes[layer][color]
 					-- Interpret as a named ANSI color code
 					ansi_code
 				elseif color::find("^\027%[[0-9;]-m$")
@@ -108,14 +114,14 @@ export set = (colors={}, options={}) ->
 			when "number"
 				assert(0 <= color <= 255)
 				-- Interpret as an XTerm 256 color code
-				ansi_codes[kind].format_256_color::format(color)
+				ansi_codes[layer].format_256_color::format(color)
 			when "table"
 				const red   = color[1] or color.r or color.red
 				const green = color[2] or color.g or color.green
 				const blue  = color[3] or color.b or color.blue
 
 				-- Interpret as an RGB / truecolor table
-				ansi_codes[kind].format_truecolor::format(red, green, blue)
+				ansi_codes[layer].format_truecolor::format(red, green, blue)
 
 	const effect_ansi_codes = if type(effects) == "string"
 		[ansi_codes.effects[effects],]

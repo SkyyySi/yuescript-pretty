@@ -130,6 +130,10 @@ const table_is_array = (tb) ->
 	count == length
 
 
+const string_is_identifier_name = (str) ->
+	str::match("^[a-zA-Z_][a-zA-Z0-9_]*$") == str
+
+
 renderers.table = (value, options={}) ->
 	with options
 		.depth ??= 0
@@ -143,6 +147,7 @@ renderers.table = (value, options={}) ->
 			else
 				"    " .. table.concat(["\027[2;3#{((i - 1) % 8)+ 1}m│\027[22;39m   " for i = 2, depth])
 		.indent_cache ??= []
+		.identifier_name_color ??= { fg: "cyan" }
 
 	if next(value, nil) == nil
 		return "{}"
@@ -164,12 +169,26 @@ renderers.table = (value, options={}) ->
 	local result = is_array and "[\n" or "{\n"
 
 	for k, v in pairs(value)
+		const key_string = if is_array
+			""
+		else
+			const temp = if type(k) == "string" and string_is_identifier_name(k)
+				color.with_string(k, options.identifier_name_color, options)
+			else
+				"[" .. render(k, options) .. "]"
+
+			temp .. ": "
+
 		result ..= (
 			child_indent ..
-			(is_array and "" or ("[" .. render(k, options) .. "]: ")) ..
-			render(v, options) ..
-			(next(value, k) == nil and "\n" or ",\n")
+			key_string ..
+			render(v, options)
 		)
+
+		result ..= if next(value, k) == nil
+			"\n"
+		else
+			",\n"
 
 	result ..= indent .. (is_array and "]" or "}")
 
@@ -183,28 +202,27 @@ export.<call> = (...) =>
 
 
 export main = (argv=arg) ->
-	print(render(nil))
+	print("nil", render(nil))
 
-	print(render(true))
-	print(render(false))
+	print("boolean", render(true), render(false))
 
-	print(render(420.69))
+	print("number", render(420.69))
 
-	print(render("Hello, world!"))
+	print("string", render("Hello, world!"))
 
-	print(render((a, b, c, ...) ->))
+	print("function", render((a, b, c, ...) ->))
 
-	print(render(coroutine.create(->)))
+	print("thread", render(coroutine.create(->)))
 
 	try
 		import "lpeg"
-		print(render(lpeg.P"xyz"))
+		print("userdata", render(lpeg.P"xyz"))
 
 	try
 		import "ffi"
-		print(render(ffi.new("int64_t")))
+		print("cdata", render(ffi.new("int64_t")))
 
-	print(render({
+	print("table", render({
 		"x", "y", "z",
 		a: "b",
 		{ foo: "bar", "Some complex key": "value" },

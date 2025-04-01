@@ -1,0 +1,36 @@
+#!/usr/bin/env yue
+--- SPDX-License-Identifier: 0BSD
+
+from _G import select, io, os
+
+from "pretty.tostring" import render
+
+
+export print_to = (file_handle, ...) ->
+	const argc = select("#", ...)
+	const argv = { ... }
+
+	const { :write, :flush } = file_handle
+
+	for i = 1, argc
+		write(render(argv[i]))
+
+		if i < argc
+			write("\027[35m,\027[39m ")
+
+	write("\n")
+	flush()
+
+	return
+
+
+export print = (...) ->
+	print_to(io, ...)
+
+
+export main = (argv=arg) ->
+	print("Hello, world!", 123, true)
+
+
+if select("#", ...) == 0
+	os.exit(main())
