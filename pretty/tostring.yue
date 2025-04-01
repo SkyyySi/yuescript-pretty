@@ -13,15 +13,17 @@ export renderers = {}
 
 
 renderers.nil = (value, options={}) ->
-	options.nil_base_color ??= { fg: "red", effects: { italic: true } }
+	with options
+		.nil_base_color ??= { fg: "red", effects: { italic: true } }
 
 	color.with_string("nil", options.nil_base_color, options)
 
 
 renderers.boolean = (value, options={}) ->
-	--options.boolean_base_color ??= { fg: "blue" }
-	options.boolean_true_base_color ??= options.boolean_base_color ?? { fg: "green", effects: { strong: true } }
-	options.boolean_false_base_color ??= options.boolean_base_color ?? { fg: "red", effects: { strong: true } }
+	with options
+		--.boolean_base_color ??= { fg: "blue" }
+		.boolean_true_base_color ??= .boolean_base_color ?? { fg: "green", effects: { strong: true } }
+		.boolean_false_base_color ??= .boolean_base_color ?? { fg: "red", effects: { strong: true } }
 
 	const this_str, this_color = if value
 		"true", options.boolean_true_base_color
@@ -32,19 +34,17 @@ renderers.boolean = (value, options={}) ->
 
 
 renderers.number = (value, options={}) ->
-	options.number_base_color ??= { fg: "blue" }
+	with options
+		.number_base_color ??= { fg: "blue" }
 
-	color.set(options.number_base_color, options) ..
-	"%.15g"::format(value) ..
-	color.reset(options.number_base_color, options)
+	color.with_string("%.15g"::format(value), options.number_base_color, options)
 
 
 renderers.string = (value, options={}) ->
-	options.string_base_color ??= { fg: "yellow" }
+	with options
+		.string_base_color ??= { fg: "yellow" }
 
-	color.set(options.string_base_color, options) ..
-	util.quote(value) ..
-	color.reset(options.string_base_color, options)
+	color.with_string(util.quote(value), options.string_base_color, options)
 
 
 const get_parameter_names = (f) ->
@@ -68,13 +68,14 @@ const get_parameter_names = (f) ->
 
 
 renderers.function = (value, options={}) ->
-	options.function_keyword_color ??= { fg: "magenta" }
-	options.function_name_color ??= {}
-	options.function_parenthesis_color ??= {}
-	options.function_opening_parenthesis_color ??= options.function_parenthesis_color ?? {}
-	options.function_closinging_parenthesis_color ??= options.function_parenthesis_color ?? {}
-	options.function_parameter_name_color ??= {}
-	options.function_parameter_delimiter_color ??= {}
+	with options
+		.function_keyword_color ??= { fg: "magenta" }
+		.function_name_color ??= {}
+		.function_parenthesis_color ??= {}
+		.function_opening_parenthesis_color ??= .function_parenthesis_color ?? {}
+		.function_closinging_parenthesis_color ??= .function_parenthesis_color ?? {}
+		.function_parameter_name_color ??= {}
+		.function_parameter_delimiter_color ??= {}
 
 	const info = debug_getinfo(value)
 
@@ -120,6 +121,9 @@ renderers.cdata = (value, options={}) ->
 
 
 renderers.table = (value, options={}) ->
+	with options
+		.depth ??= 0
+
 	tostring(value)
 
 
