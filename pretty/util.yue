@@ -2,6 +2,13 @@
 --- SPDX-License-Identifier: 0BSD
 
 from _G import type, error, assert, print, tostring, ipairs, io, os, debug, table, string, getmetatable, setmetatable
+const {
+	char:   string_char,
+	sub:    string_sub,
+	match:  string_match,
+	gmatch: string_gmatch,
+	find:   string_find,
+} = string
 
 import "pretty.color"
 
@@ -28,8 +35,11 @@ export unpack = table.unpack ?? _G.unpack
 
 
 export pack = (...) ->
-	with { ... }
-		.n = select("#", ...)
+	const argc = select("#", ...)
+	const argv = with { ... }
+		.n = argc
+
+	argv, argc
 
 
 export split = (str, delimiter_pattern="%s+") ->
@@ -46,19 +56,40 @@ export split = (str, delimiter_pattern="%s+") ->
 	const result = []
 
 	local last_match_end = 0
-	for match, i in str::gmatch("(.-)" .. delimiter_pattern .. "()")
+	for match, i in string_gmatch(str, "(.-)" .. delimiter_pattern .. "()")
 		last_match_end = i
 		result[] = match
 
-	result[] = str::sub(last_match_end)
+	result[] = string_char(str, last_match_end)
 
 	result
 
 
+export map_chars = (str, f) ->
+	check_arguments("pretty.util.split", [
+		[1, "str", "string",   str],
+		[2, "f",   "function", f],
+	])
+
+	const length = #str
+
+	local result = ""
+
+	for i = 1, length
+		result ..= f(string_sub(str, i, i), i, length)
+
+	result
+
+
+export is_identifier_name = (str) ->
+	(type(str) == "string") and
+	(string_match(str, "^[a-zA-Z_][a-zA-Z0-9_]*$") == str)
+
+
 -- https://en.wikipedia.org/wiki/Control_Pictures
 const unicode_control_pictures = do
-	const temp = string.char(226) .. string.char(144)
-	{ string.char(i), temp .. string.char(i + 128) for i = 0, 31 }
+	const temp = string_char(226) .. string_char(144)
+	{ string_char(i), temp .. string_char(i + 128) for i = 0, 31 }
 
 const named_escapes = {
 	"\\": "\\\\",
@@ -74,12 +105,12 @@ const named_escapes = {
 	"\'": "\\\'",
 }
 
-const decimal_escapes = { string.char(i), "\\%03d"::format(i) for i = 0, 255 }
+const decimal_escapes = { string_char(i), "\\%03d"::format(i) for i = 0, 255 }
 
-const hexadecimal_escapes = { string.char(i), "\\x%02X"::format(i) for i = 0, 255 }
+const hexadecimal_escapes = { string_char(i), "\\x%02X"::format(i) for i = 0, 255 }
 
 const unmapped_characters = do
-	const temp = { string.char(i), string.char(i) for i = 32, 126 }
+	const temp = { string_char(i), string_char(i) for i = 32, 126 }
 	temp["\\"] = "\\"
 	temp["\027"] = "\027"
 	temp
@@ -96,42 +127,47 @@ const quote_char_map = {
 export quote = (str, options={}) ->
 	options.quote_char_map ??= quote_char_map
 	options.quote_escape_highlighter ??= (escape) ->
-		"\027[1;7m" .. escape .. "\027[22;27m"
+		--color.with_string(escape, { effects: { strong: true, invert: true } }, options)
+		"\027[1;7m#{escape}\027[22;27m"
 	options.quote_string_base_color ??= options.string_base_color ?? { fg: "yellow" }
+
+	const {
+		quote_string_base_color: base_color,
+	} = options
 
 	check_arguments("pretty.util.quote", [
 		[1, "str", "string", str],
 	])
 
-	const quote_char = if str::find('"') and not str::find("'")
+	const quote_char = if string_find(str, '"') and not string_find(str, "'")
 		"'"
 	else
 		'"'
 
 	local skip_until_pos = nil
-	color.set(options.quote_string_base_color, options) ..
-	quote_char ..
-	str::gsub(
-		"()([%z\001-\255])",
-		(pos, char) ->
+	color.with_string((
+		quote_char ..
+		map_chars(str, (char, index, total_length) ->
 			const mapped_char = options.quote_char_map[char] ?? char
 
-			return if skip_until_pos?
-				if pos < skip_until_pos
+			if skip_until_pos?
+				if index == total_length
+					mapped_char .. "\027[0m" .. color.set(base_color, options)
+				elseif index < skip_until_pos
 					mapped_char
 				else
 					skip_until_pos = nil
-					"\027[0m" .. mapped_char
-			elseif ansi_color_escape := str::sub(pos)::match("^\027%[[0-9;]-m")
-				skip_until_pos = pos + #ansi_color_escape
+					"\027[0m" .. color.set(base_color, options) .. mapped_char
+			elseif ansi_color_escape := str |> string_sub(index) |> string_match("^\027%[[0-9;]-m")
+				skip_until_pos = index + #ansi_color_escape
 				"\027[0m#{ansi_color_escape}\\e"
 			elseif mapped_char == char
 				char
 			else
 				options.quote_escape_highlighter(mapped_char)
-	) ..
-	color.set(options.quote_string_base_color, options) ..
-	quote_char
+		) ..
+		quote_char
+	), base_color, options)
 
 
 export main = (argv=arg) ->
@@ -139,8 +175,8 @@ export main = (argv=arg) ->
 	--for k, v in ipairs(split(test_string_1, " "))
 	--	print(k, "%q"::format(v))
 
-	const test_string_2 = table.concat([string.char(i) for i = 0, 255]) ..
-		"\027[1;31;45mColor test\027[0m"
+	const test_string_2 = table.concat([string_char(i) for i = 0, 255]) ..
+		"\027[1;31;45mColor test\027[0;41m"
 	print("\027[0m" .. quote(test_string_2) .. "\027[0m")
 
 

@@ -130,10 +130,6 @@ const table_is_array = (tb) ->
 	count == length
 
 
-const string_is_identifier_name = (str) ->
-	str::match("^[a-zA-Z_][a-zA-Z0-9_]*$") == str
-
-
 renderers.table = (value, options={}) ->
 	with options
 		.depth ??= 0
@@ -180,8 +176,8 @@ renderers.table = (value, options={}) ->
 			return false
 
 		if type_of_a == "string" and type_of_b == "string"
-			const a_is_iden = string_is_identifier_name(a)
-			const b_is_iden = string_is_identifier_name(b)
+			const a_is_iden = util.is_identifier_name(a)
+			const b_is_iden = util.is_identifier_name(b)
 
 			if a_is_iden and not b_is_iden
 				return true
@@ -198,7 +194,7 @@ renderers.table = (value, options={}) ->
 		const key_string = if is_array
 			""
 		else
-			const temp = if type(k) == "string" and string_is_identifier_name(k)
+			const temp = if type(k) == "string" and util.is_identifier_name(k)
 				color.with_string(k, options.identifier_name_color, options)
 			else
 				"[" .. render(k, options) .. "]"
