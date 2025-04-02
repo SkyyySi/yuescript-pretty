@@ -83,6 +83,44 @@ const ansi_codes = {
 }
 
 
+const ansi_color_helper = (color, layer) ->
+	assert(layer in ["fg", "bg"])
+
+	switch type(color)
+		when "nil"
+			""
+		when "string"
+			if ansi_code := ansi_codes[layer][color]
+				-- Interpret as a named ANSI color code
+				ansi_code
+			elseif hex_code := color::match("^#([0-9a-fA-F]+)$")
+				const length = #hex_code
+				assert(length >= 3)
+				assert(length % 3 == 0)
+
+				const part_length = math.floor(length / 3)
+				const helper = (i) ->
+					assert(tonumber(hex_code::sub(part_length * (i - 1) + 1, part_length * i), 16))
+
+				const red, green, blue = helper(1), helper(2), helper(3)
+				print("red=%d, green=%d, blue=%d"::format(red, green, blue))
+				ansi_codes[layer].format_truecolor::format(red, green, blue)
+			elseif color::find("^\027%[[0-9;]-m$")
+				-- Interpret as a raw ANSI escape sequence
+				color
+		when "number"
+			assert(0 <= color <= 255)
+			-- Interpret as an XTerm 256 color code
+			ansi_codes[layer].format_256_color::format(color)
+		when "table"
+			const red   = color[1] or color.r or color.red
+			const green = color[2] or color.g or color.green
+			const blue  = color[3] or color.b or color.blue
+
+			-- Interpret as an RGB / truecolor table
+			ansi_codes[layer].format_truecolor::format(red, green, blue)
+
+
 export class Color
 	new: (kwargs={}) =>
 		with kwargs
@@ -90,9 +128,7 @@ export class Color
 			@bg = .bg
 			@effects = .effects ?? {}
 
-	render: (str) =>
-
-	apply: (str) =>
+	to_ansi: () =>
 
 
 export set = (colors={}, options={}) ->
@@ -160,7 +196,9 @@ export with_string = (str, colors, options) ->
 
 
 export main = (argv=arg) ->
+	print(ansi_color_helper("#00ff80", "fg"))
 	print("#{$FILE} :: main() :: #{$LINE}")
+	print("\027[0m")
 
 
 if select("#", ...) == 0
