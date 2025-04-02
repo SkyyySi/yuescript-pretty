@@ -1,0 +1,41 @@
+#!/usr/bin/env yue
+--- SPDX-License-Identifier: 0BSD
+
+import "pretty.util"
+
+
+export get_visual_string_width = (str) ->
+	local length = util.get_utf8_length(str)
+
+	for start_pos, end_pos in str::gmatch("()\027%[[0-9;]-m()")
+		length -= end_pos - start_pos
+
+	length
+
+
+export class Console
+	new: () =>
+		-- ...
+
+	get_cursor_position: () =>
+		-- ...
+
+	set_cursor_position: (x, y) =>
+		-- ...
+
+
+export main = (argv=arg) ->
+	const test = "\027[1;31mHello\027[0m, world!ÜÖÄ"
+	print("test = %q\n#test = %d\nutil.get_utf8_length(test) = %d\nget_visual_string_width(test) = %d"::format(
+		test,
+		#test,
+		util.get_utf8_length(test),
+		get_visual_string_width(test),
+	))
+	print()
+	print("|" .. test .. "|")
+	print("|" .. "="::rep(get_visual_string_width(test)) .. "|")
+
+
+if select("#", ...) == 0
+	os.exit(main())

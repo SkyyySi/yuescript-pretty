@@ -8,6 +8,7 @@ const {
 	match:  string_match,
 	gmatch: string_gmatch,
 	find:   string_find,
+	byte:   string_byte,
 } = string
 
 import "pretty.color"
@@ -84,6 +85,31 @@ export map_chars = (str, f) ->
 export is_identifier_name = (str) ->
 	(type(str) == "string") and
 	(string_match(str, "^[a-zA-Z_][a-zA-Z0-9_]*$") == str)
+
+
+export get_utf8_length = (str) ->
+	const raw_length = #str
+
+	local length = 0
+
+	local i = 1
+	while i <= raw_length do
+		const byte = string_byte(str, i)
+
+		i += if byte <= 127 then
+			1
+		elseif byte >= 192 and byte <= 223 then
+			2
+		elseif byte >= 224 and byte <= 239 then
+			3
+		elseif byte >= 240 and byte <= 247 then
+			4
+		else
+			error("Invalid UTF-8 character! (byte value #{byte})")
+
+		length += 1
+
+	length
 
 
 -- https://en.wikipedia.org/wiki/Control_Pictures
