@@ -141,15 +141,17 @@ renderers.table = (value, options={}) ->
 			elseif depth == 1
 				"    "
 			else
-				"    " .. table.concat(["\027[2;3#{((i - 1) % 8)+ 1}m│\027[22;39m   " for i = 2, depth])
+				"    " .. table.concat(["\027[2;3#{((i - 2) % 7)+ 1}m│\027[22;39m   " for i = 2, depth])
 		.indent_cache ??= []
 		.identifier_name_color ??= { fg: "cyan" }
 
+	const depth = options.depth
+	const bracket_color_format = "\027[3#{((depth - 1) % 7) + 1}m%s\027[39m" 
+
 	if next(value, nil) == nil
-		return "{}"
+		return bracket_color_format::format("{}")
 
 	const is_array = table_is_array(value)
-	const depth = options.depth
 	const get_indent_cached = (depth) ->
 		if cached := options.indent_cache[depth]
 			cached
@@ -162,7 +164,7 @@ renderers.table = (value, options={}) ->
 
 	options.depth += 1
 
-	local result = is_array and "[\n" or "{\n"
+	local result = bracket_color_format::format(is_array and "[\n" or "{\n")
 
 	const keys = [k for k, v in pairs(value)]
 	keys.<> = { __weak: "v" }
@@ -212,7 +214,7 @@ renderers.table = (value, options={}) ->
 		else
 			",\n"
 
-	result ..= indent .. (is_array and "]" or "}")
+	result ..= indent .. bracket_color_format::format(is_array and "]" or "}")
 
 	options.depth -= 1
 
@@ -232,7 +234,7 @@ export main = (argv=arg) ->
 
 	print("string", render("Hello, world!"))
 
-	print("function", render((a, b, c, ...) ->))
+	print("function", render((a, b, c, ...) =>))
 
 	print("thread", render(coroutine.create(->)))
 
@@ -249,6 +251,16 @@ export main = (argv=arg) ->
 		a: "b",
 		{ foo: "bar", biz: "baz", "Some complex key": "value" },
 		["first", "second", "third", "fourth"],
+		{},
+		{
+			alpha: {
+				beta: {
+					gamma: {
+						omega: {{{{{{{{{{{}}}}}}}}}}}
+					}
+				}
+			}
+		}
 	}))
 
 
