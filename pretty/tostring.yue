@@ -168,7 +168,33 @@ renderers.table = (value, options={}) ->
 
 	local result = is_array and "[\n" or "{\n"
 
-	for k, v in pairs(value)
+	const keys = [k for k, v in pairs(value)]
+	keys.<> = { __weak: "v" }
+	table.sort(keys, (a, b) ->
+		const type_of_a, type_of_b = type(a), type(b)
+
+		if type_of_a == "number" and type_of_b == "string"
+			return true
+
+		if type_of_a != type_of_b
+			return false
+
+		if type_of_a == "string" and type_of_b == "string"
+			const a_is_iden = string_is_identifier_name(a)
+			const b_is_iden = string_is_identifier_name(b)
+
+			if a_is_iden and not b_is_iden
+				return true
+
+			if b_is_iden and not a_is_iden
+				return false
+
+		a < b
+	)
+
+	for k in *keys
+		const v = value[k]
+
 		const key_string = if is_array
 			""
 		else
@@ -225,7 +251,7 @@ export main = (argv=arg) ->
 	print("table", render({
 		"x", "y", "z",
 		a: "b",
-		{ foo: "bar", "Some complex key": "value" },
+		{ foo: "bar", biz: "baz", "Some complex key": "value" },
 		["first", "second", "third", "fourth"],
 	}))
 
