@@ -17,7 +17,6 @@ U+255x	═	║	╒	╓	╔	╕	╖	╗	╘	╙	╚	╛	╜	╝	╞	╟
 U+256x	╠	╡	╢	╣	╤	╥	╦	╧	╨	╩	╪	╫	╬	╭	╮	╯
 U+257x	╰	╱	╲	╳	╴	╵	╶	╷	╸	╹	╺	╻	╼	╽	╾	╿
 --]]
-
 --- The keys are strings representing which sides the cosrosponding character
 --- is connected to, and in what style: [l]eft, [r]ight, [t]op and [b]ottom
 --- for the direction(s), optionally followed by one of the style indicators
@@ -26,6 +25,8 @@ U+257x	╰	╱	╲	╳	╴	╵	╶	╷	╸	╹	╺	╻	╼	╽	╾	╿
 --- instead of a complete / unobstructed line, with that amount of sections.
 --- Each direction is seperated by an underscore. They are sorted as cardinal
 --- directions, so the order is top, right, bottom and then left.
+---
+--- TODO: Complete this character set.
 const charset = {
 	t:       "╵"
 	t_r:     "└"
@@ -58,6 +59,59 @@ const charset = {
 	b_l: "┐"
 	l:   "╴"
 }
+
+---@alias BoxCharStyle
+---| nil
+---| true
+---| "normal"
+---| "bold"
+---| "double"
+---| "smooth"
+---| 2
+---| 3
+---| 4
+--- TODO: Complete this function, after finishing `charset`.
+---@param styles { top: BoxCharStyle, right: BoxCharStyle, bottom: BoxCharStyle, left: BoxCharStyle }
+---@return string
+export get_box_char = (styles={}) ->
+	assert(type(styles) == "table")
+
+	if next(styles, nil) == nil
+		return " "
+
+	local key_parts = ["", "", "", ""]
+
+	for i, side in ipairs(["top", "right", "bottom", "left"])
+		const style = styles[side]
+
+		switch style
+			when nil
+				-- pass
+			when true
+				key_parts[i] = side::sub(1, 1)
+			when "normal"
+				error("TODO: Implement style == \"normal\" for get_box_char()")
+			when "bold"
+				error("TODO: Implement style == \"bold\" for get_box_char()")
+			when "double"
+				error("TODO: Implement style == \"double\" for get_box_char()")
+			when "smooth"
+				error("TODO: Implement style == \"smooth\" for get_box_char()")
+			when 2
+				error("TODO: Implement style == 2 for get_box_char()")
+			when 3
+				error("TODO: Implement style == 3 for get_box_char()")
+			when 4
+				error("TODO: Implement style == 4 for get_box_char()")
+			else
+				error("Invalid box character style %q!"::format(
+					tostring(style)
+				))
+
+	assert(charset[table.concat(
+		[i for i in *key_parts when i != ""],
+		"_",
+	)])
 
 
 export main = (argv=arg) ->
