@@ -30,18 +30,21 @@ U+257x	╰	╱	╲	╳	╴	╵	╶	╷	╸	╹	╺	╻	╼	╽	╾	╿
 const charset = {
 	t:       "╵"
 	t_r:     "└"
-	t_b:     "│"
 	t_r_b:   "├"
 	t_r_b_l: "┼"
-	t_l:     "┘"
+	t_r_l:   "┴"
+	t_b:     "│"
 	t_b_l:   "┤"
-	r:   "╶"
-	r_b: "┌"
-	r_l: "─"
-	b:   "╷"
-	b_l: "┐"
-	l:   "╴"
+	t_l:     "┘"
+	r:       "╶"
+	r_b:     "┌"
+	r_b_l:   "┬"
+	r_l:     "─"
+	b:       "╷"
+	b_l:     "┐"
+	l:       "╴"
 
+	--[[
 	tB:    "╹"
 	t_rB:  "┕"
 	tB_r:  "┖"
@@ -58,11 +61,12 @@ const charset = {
 	b:   "╷"
 	b_l: "┐"
 	l:   "╴"
+	--]]
 }
 
 ---@alias BoxCharStyle
 ---| nil
----| true
+---| boolean
 ---| "normal"
 ---| "bold"
 ---| "double"
@@ -71,13 +75,13 @@ const charset = {
 ---| 3
 ---| 4
 --- TODO: Complete this function, after finishing `charset`.
----@param styles { top: BoxCharStyle, right: BoxCharStyle, bottom: BoxCharStyle, left: BoxCharStyle }
+---@param styles { ["top"|"right"|"bottom"|"left"]: BoxCharStyle }
 ---@return string
 export get_box_char = (styles={}) ->
 	assert(type(styles) == "table")
 
 	if next(styles, nil) == nil
-		return " "
+		return ""
 
 	local key_parts = ["", "", "", ""]
 
@@ -85,12 +89,13 @@ export get_box_char = (styles={}) ->
 		const style = styles[side]
 
 		switch style
-			when nil
+			when nil, false
 				-- pass
 			when true
 				key_parts[i] = side::sub(1, 1)
 			when "normal"
-				error("TODO: Implement style == \"normal\" for get_box_char()")
+				--error("TODO: Implement style == \"normal\" for get_box_char()")
+				key_parts[i] = side::sub(1, 1)
 			when "bold"
 				error("TODO: Implement style == \"bold\" for get_box_char()")
 			when "double"
@@ -117,8 +122,22 @@ export get_box_char = (styles={}) ->
 export main = (argv=arg) ->
 	print("Hello from %q:%d"::format($FILE, $LINE))
 
-	for k, v in pairs(charset)
-		print(k, v)
+	--for k, v in pairs(charset)
+	--	print(k, v)
+
+	const top, right, bottom, left = true, true, true, true
+
+	const p = (...) ->
+		const box_char = get_box_char(...)
+		print("%q (#%d --> [%s])"::format(box_char, #box_char, table.concat(
+			["0x%02x"::format(byte) for byte in *{ box_char::byte(1, #box_char) }],
+			", "
+		)))
+
+	p({})
+	p({ :top, :bottom })
+	p({ :left, :right })
+	p({ :top, :left, :right })
 
 
 if select("#", ...) == 0
