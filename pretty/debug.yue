@@ -1,0 +1,78 @@
+#!/usr/bin/env yue
+--- SPDX-License-Identifier: 0BSD
+
+from _G import debug, rawget, rawset, getmetatable, setmetatable
+
+import "pretty.util"
+
+
+class CallStack
+	new: () =>
+		local length = 0
+
+		const max_allowed_depth = 100
+		for i = 1, max_allowed_depth + 1
+			if i > 100
+				error("The maximum allowed function call-stack depth of #{max_allowed_depth} has been exceeded!")
+
+			const temp = debug.getinfo(level + i)
+
+			if temp == nil
+				break
+
+			length += 1
+			rawset(@, length, temp)
+
+		rawset(@, "length", length)
+
+
+const get_call_stack = (level=0) ->
+	const stack = []
+
+	stack.<> = {
+		__index: (key) =>
+			if key in ["n", "count", "size"]
+				return rawget(@, "length")
+
+		__newindex: (key, value) =>
+			error("Attempted to insert a value into a call-stack object, which is immutable!")
+
+		__call: do
+			local index = 0
+			() =>
+				index = if index == nil
+					1
+				else
+					index + 1
+
+				if index > length
+					index = nil
+					return
+
+				const value = @[index]
+				index, value
+	}
+
+	stack
+
+
+export get_traceback = (message, level=0) ->
+	--debug.traceback(nil, level + 1)
+	local traceback = ""
+
+	for index, info in get_call_stack()
+		traceback ..= "#{index}: #{info.name ?? '<anonymous>'}\n"
+
+	if message?
+		traceback = message .. "\n" .. traceback
+
+	traceback
+
+
+export main = (argv=arg) ->
+	import "yue"
+	yue.p(get_traceback())
+
+
+if select("#", ...) == 0
+	os.exit(main())
