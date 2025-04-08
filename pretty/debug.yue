@@ -1,18 +1,20 @@
 #!/usr/bin/env yue
 --- SPDX-License-Identifier: 0BSD
 
-from _G import debug, rawget, rawset, getmetatable, setmetatable
+from _G import require, debug, rawget, rawset, getmetatable, setmetatable, tostring, type, error, table, os
 
 import "pretty.util"
 
 
-class CallStack
-	new: () =>
+export class CallStack
+	new: (level=0) =>
+		level += 2
+
 		local length = 0
 
 		const max_allowed_depth = 100
 		for i = 1, max_allowed_depth + 1
-			if i > 100
+			if i > max_allowed_depth
 				error("The maximum allowed function call-stack depth of #{max_allowed_depth} has been exceeded!")
 
 			const temp = debug.getinfo(level + i)
@@ -26,52 +28,77 @@ class CallStack
 		rawset(@, "length", length)
 
 
-const get_call_stack = (level=0) ->
-	const stack = []
+	__index: (key) =>
+		const type_of_key = type(key)
 
-	stack.<> = {
-		__index: (key) =>
-			if key in ["n", "count", "size"]
-				return rawget(@, "length")
-
-		__newindex: (key, value) =>
-			error("Attempted to insert a value into a call-stack object, which is immutable!")
-
-		__call: do
-			local index = 0
-			() =>
-				index = if index == nil
-					1
+		if type_of_key == "number"
+			error("Index out of range! (expected 1..#{rawget(@, 'length')}, got: #{key})")
+		elseif key in ["n", "count", "size"]
+			rawget(@, "length")
+		else
+			const value_in_base = @.<>[key]
+			if value_in_base? 
+				value_in_base
+			else
+				const key_string = if type_of_key == "string"
+					"%q"::format(key)
 				else
-					index + 1
+					tostring(key)
 
-				if index > length
-					index = nil
-					return
+				error("Invalid key #{key_string}!")
 
-				const value = @[index]
-				index, value
-	}
+	__newindex: (key, value) =>
+		error("Attempted to insert a value into a CallStack-instance, which is immutable!")
 
-	stack
+	__call: do
+		local index = 0
+
+		() =>
+			index += 1
+
+			if index > @length
+				index = 0
+				return
+
+			const value = @[index]
+			index, value
 
 
 export get_traceback = (message, level=0) ->
-	--debug.traceback(nil, level + 1)
-	local traceback = ""
+	level += 1
 
-	for index, info in get_call_stack()
-		traceback ..= "#{index}: #{info.name ?? '<anonymous>'}\n"
+	const call_stack = CallStack(level)
+
+	local traceback = do
+		const format_entry = (index, entry) ->
+			const { :name = '<anonymous>' } = entry
+			const padding = " "::rep(
+				math.ceil(math.log10(call_stack.length + 1)) -
+				math.ceil(math.log10(index + 1))
+			)
+			" #{padding}#{index} | #{name}"
+
+		table.concat(
+			[format_entry(index, entry) for index, entry in call_stack]
+			"\n"
+		)
 
 	if message?
-		traceback = message .. "\n" .. traceback
+		traceback = (
+			message ..
+			"\n------------\n" ..
+			traceback
+		)
 
 	traceback
 
 
 export main = (argv=arg) ->
-	import "yue"
-	yue.p(get_traceback())
+	f = -> _ = print(get_traceback("Hello, world!", -4) .. "\n\n")
+	g = -> _ = f!
+	h = -> _ = g!
+
+	_ = [f!, g!, h!]
 
 
 if select("#", ...) == 0
