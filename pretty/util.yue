@@ -11,6 +11,32 @@ const {
 	byte:   string_byte,
 } = string
 
+local lshift, rshift, band, bor
+try
+	{ :lshift, :rshift, :band, :bor } = require("bit")
+catch _err
+	const make_bitop = (symbol) ->
+		const op_base = load("return function(a, b) return a #{symbol} b end")()
+
+		(...) ->
+			const argc = select("#", ...)
+			const argv = { ... }
+
+			if argc < 1
+				return 0
+
+			local result = argv[1]
+
+			for i = 2, argc
+				result = op_base(result, argv[i])
+
+			result
+
+	lshift = make_bitop("<<")
+	rshift = make_bitop(">>")
+	band = make_bitop("&")
+	bor = make_bitop("|")
+
 import "pretty.color"
 
 
@@ -61,7 +87,7 @@ export split = (str, delimiter_pattern="%s+") ->
 		last_match_end = i
 		result[] = match
 
-	result[] = string_char(str, last_match_end)
+	result[] = string_sub(str, last_match_end)
 
 	result
 
@@ -87,6 +113,33 @@ export is_identifier_name = (str) ->
 	(string_match(str, "^[a-zA-Z_][a-zA-Z0-9_]*$") == str)
 
 
+export get_utf8_chars = (str) ->
+	const raw_length = #str
+
+	const chars = []
+
+	local i = 1
+	while i <= raw_length do
+		const byte = string_byte(str, i)
+
+		const byte_count = if byte <= 127 then
+			1
+		elseif byte >= 192 and byte <= 223 then
+			2
+		elseif byte >= 224 and byte <= 239 then
+			3
+		elseif byte >= 240 and byte <= 247 then
+			4
+		else
+			error("Invalid UTF-8 character! (byte value #{byte})")
+
+		chars[] = str::sub(i, i + byte_count - 1)
+
+		i += byte_count
+
+	chars
+
+
 export get_utf8_length = (str) ->
 	const raw_length = #str
 
@@ -110,6 +163,276 @@ export get_utf8_length = (str) ->
 		length += 1
 
 	length
+
+
+const pass_through = (...) ->
+	...
+
+
+export class Range
+	new: (...) =>
+		const argc = select("#", ...)
+
+		if argc == 1
+			@start = 1
+			@stop = ...
+			@step_size = 1
+		elseif argc == 2
+			@start, @stop = pass_through(...)
+			@step_size = 1
+		elseif argc == 3
+			@start, @stop, @step_size = pass_through(...)
+		else
+			error("Wrong number of arguments! (expected 1 to 3, got: #{argc})")
+
+		if @step_size == 0
+			error("The step size must not be 0!")
+
+		@__is_backwards__ = @step_size < 0
+
+		@reset()
+
+	reset: () =>
+		@__iter_index__ = @start - @step_size
+
+	is_not_done: () =>
+		if @__is_backwards__
+			@start < @__iter_index__ < @stop
+		else
+			@start > @__iter_index__ > @stop
+
+	__call: () =>
+		if @is_not_done()
+			const value = @__iter_index__
+			@__iter_index__ = value + @step_size
+			return value
+
+		@reset()
+
+
+const double_width_unicode_ranges = {
+	--[[
+	{ 0x1100, 0x115F },
+	{ 0x231A, 0x231B },
+	{ 0x2329, 0x232A },
+	{ 0x23E9, 0x23EC },
+	{ 0x23F0, 0x23F0 },
+	{ 0x23F3, 0x23F3 },
+	{ 0x25FD, 0x25FE },
+	{ 0x2614, 0x2615 },
+	{ 0x2648, 0x2653 },
+	{ 0x267F, 0x267F },
+	{ 0x2693, 0x2693 },
+	{ 0x26A1, 0x26A1 },
+	{ 0x26AA, 0x26AB },
+	{ 0x26BD, 0x26BE },
+	{ 0x26C4, 0x26C5 },
+	{ 0x26CE, 0x26CE },
+	{ 0x26D4, 0x26D4 },
+	{ 0x26EA, 0x26EA },
+	{ 0x26F2, 0x26F3 },
+	{ 0x26F5, 0x26F5 },
+	{ 0x26FA, 0x26FA },
+	{ 0x26FD, 0x26FD },
+	{ 0x2705, 0x2705 },
+	{ 0x270A, 0x270B },
+	{ 0x2728, 0x2728 },
+	{ 0x274C, 0x274C },
+	{ 0x274E, 0x274E },
+	{ 0x2753, 0x2755 },
+	{ 0x2757, 0x2757 },
+	{ 0x2795, 0x2797 },
+	{ 0x27B0, 0x27B0 },
+	{ 0x27BF, 0x27BF },
+	{ 0x2B1B, 0x2B1C },
+	{ 0x2B50, 0x2B50 },
+	{ 0x2B55, 0x2B55 },
+	{ 0x2E80, 0x2FFB },
+	{ 0x3000, 0x303E },
+	{ 0x3041, 0x33FF },
+	{ 0x3400, 0x4DBF },
+	{ 0x4E00, 0xA4C6 },
+	{ 0xA960, 0xA97C },
+	{ 0xAC00, 0xD7A3 },
+	{ 0xF900, 0xFAFF },
+	{ 0xFE10, 0xFE19 },
+	{ 0xFE30, 0xFE6B },
+	{ 0xFF01, 0xFF60 },
+	{ 0xFFE0, 0xFFE6 },
+	{ 0x1F004, 0x1F004 },
+	{ 0x1F0CF, 0x1F0CF },
+	{ 0x1F18E, 0x1F18E },
+	{ 0x1F191, 0x1F19A },
+	{ 0x1F200, 0x1F251 },
+	{ 0x1F300, 0x1F64F },
+	{ 0x1F680, 0x1F6FF },
+	{ 0x1F900, 0x1F9FF },
+	{ 0x20000, 0x2FFFD },
+	{ 0x30000, 0x3FFFD },
+	--]]
+	{ 0x1F004, 0x1F9FF }, -- most emoji
+	--[[
+	{ 0x1FA70, 0x1FAFF }, -- new emoji (symbols & pictographs)
+	{ 0x1F000, 0x1F02F }, -- Mahjong, domino tiles
+	{ 0x1F0A0, 0x1F0FF }, -- playing cards
+	{ 0x1F300, 0x1F5FF }, -- misc symbols and pictographs
+	{ 0x1F600, 0x1F64F }, -- emoticons
+	{ 0x1F680, 0x1F6FF }, -- transport & map
+	{ 0x1F700, 0x1F77F }, -- alchemical symbols
+	{ 0x1F780, 0x1F7FF }, -- geometric shapes extended
+	{ 0x1F800, 0x1F8FF }, -- supplemental arrows-c
+	{ 0x1FA00, 0x1FA6F }, -- chess symbols etc
+	--]]
+}
+
+
+const codepoint_to_utf8_cache = {}
+const utf8_to_codepoint_cache = {}
+
+
+export codepoint_to_utf8 = (codepoint) ->
+	if cached_char := codepoint_to_utf8_cache[codepoint]
+		return cached_char
+
+	local char = if codepoint <= 0x7F then
+		string_char(codepoint)
+	elseif codepoint <= 0x7FF then
+		const b1 = bor(0xC0, rshift(codepoint, 6))
+		const b2 = bor(0x80, band(codepoint, 0x3F))
+
+		string_char(b1, b2)
+	elseif codepoint <= 0xFFFF then
+		const b1 = bor(0xE0, rshift(codepoint, 12))
+		const b2 = bor(0x80, band(rshift(codepoint, 6), 0x3F))
+		const b3 = bor(0x80, band(codepoint, 0x3F))
+
+		string_char(b1, b2, b3)
+	elseif codepoint <= 0x10FFFF then
+		const b1 = bor(0xF0, rshift(codepoint, 18))
+		const b2 = bor(0x80, band(rshift(codepoint, 12), 0x3F))
+		const b3 = bor(0x80, band(rshift(codepoint, 6), 0x3F))
+		const b4 = bor(0x80, band(codepoint, 0x3F))
+
+		string_char(b1, b2, b3, b4)
+	else
+		error("Invalid Unicode codepoint: #{codepoint}")
+
+	codepoint_to_utf8_cache[codepoint] = char
+	utf8_to_codepoint_cache[char] ??= codepoint
+
+	char
+
+
+export utf8_to_codepoint = (char) ->
+	if codepoint := utf8_to_codepoint_cache[char]
+		return codepoint
+
+	const b1, b2, b3, b4 = string_byte(char, 1, 4)
+
+	local codepoint = if b1 < 0x80 then
+		b1
+	elseif b1 < 0xE0 then
+		bor(
+			lshift(band(b1, 0x1F), 6),
+			band(b2, 0x3F),
+		)
+	elseif b1 < 0xF0 then
+		bor(
+			lshift(band(b1, 0x0F), 12),
+			lshift(band(b2, 0x3F), 6),
+			band(b3, 0x3F),
+		)
+	else
+		bor(
+			lshift(band(b1, 0x07), 18),
+			lshift(band(b2, 0x3F), 12),
+			lshift(band(b3, 0x3F), 6),
+			band(b4, 0x3F),
+		)
+
+	utf8_to_codepoint_cache[char] = codepoint
+	codepoint_to_utf8_cache[codepoint] ??= char
+
+	codepoint
+
+
+const double_width_utf8_chars = with {}
+	local count = 0
+
+	for range in *double_width_unicode_ranges
+		for codepoint = range[1], range[2]
+			count += 1
+
+			const char = codepoint_to_utf8(codepoint)
+
+			[char] = codepoint
+			[codepoint] = char
+
+	.<> = {
+		__name: "pretty.util.double_width_utf8_chars"
+
+		__len: () => count
+
+		__index: (key) =>
+			if key in ["n", "length", "count"]
+				return count
+
+			do
+				const value = getmetatable(@)[key]
+
+				if value?
+					return value
+
+			nil
+
+		__newindex: (key, value) =>
+			error("'#{@__name}' may not be modified!")
+
+		get_codepoint: (char) =>
+			assert(type(char) == "string")
+			rawget(@, char)
+
+		get_char: (codepoint) =>
+			assert(type(codepoint) == "number")
+			rawget(@, codepoint)
+
+		pairs: () =>
+			local codepoint, char
+
+			() ->
+				repeat
+					codepoint, char = next(@, codepoint)
+
+					if codepoint == nil
+						return
+				until type(codepoint) == "number"
+
+				codepoint, char
+	}
+
+
+export get_char_display_width = (char) ->
+	if double_width_utf8_chars::get_codepoint(char)?
+		2
+	else
+		1
+
+
+export get_display_width = (str) ->
+	const chars = get_utf8_chars(str)
+
+	local result = 0
+
+	for char in *chars
+		result += if double_width_utf8_chars::get_codepoint(char)?
+			2
+		else
+			1
+
+	result
+
+--for codepoint, char in double_width_utf8_chars::pairs()
+--	print(codepoint, "%q"::format(char))
 
 
 -- https://en.wikipedia.org/wiki/Control_Pictures
@@ -197,13 +520,29 @@ export quote = (str, options={}) ->
 
 
 export main = (argv=arg) ->
-	--const test_string_1 = "foo bar biz  baz"
-	--for k, v in ipairs(split(test_string_1, " "))
-	--	print(k, "%q"::format(v))
+	const test_string_1 = "foo bar biz   baz "
+	for k, v in ipairs(split(test_string_1, " "))
+		print(k, "%q"::format(v))
+
+	print("-"::rep(40))
 
 	const test_string_2 = table.concat([string_char(i) for i = 0, 255]) ..
 		"\027[1;31;45mColor test\027[0;41m"
 	print("\027[0m" .. quote(test_string_2) .. "\027[0m")
+
+	print("-"::rep(40))
+
+	for codepoint = 0x1F004, 0x1F9FF
+		io.write("u+%04x -> %q | "::format(codepoint, codepoint_to_utf8(codepoint)))
+	print()
+
+	while true
+		io.write("Enter a unicode codepoint: ")
+		io.flush()
+
+		const codepoint = assert(tonumber(assert(io.read("*l")), 16))
+
+		print("u+%04x -> %q"::format(codepoint, codepoint_to_utf8(codepoint)))
 
 
 if select("#", ...) == 0

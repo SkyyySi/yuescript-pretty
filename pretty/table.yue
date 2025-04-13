@@ -3,6 +3,9 @@
 
 from _G import type, error, assert, print, tostring, ipairs, io, os, debug, table, string, getmetatable, setmetatable
 
+from "pretty.util" import get_utf8_chars, get_utf8_length, get_char_display_width
+
+
 
 --[[
 https://en.m.wikipedia.org/wiki/Box-drawing_characters#Box_Drawing
@@ -91,10 +94,7 @@ export get_box_char = (styles={}) ->
 		switch style
 			when nil, false
 				-- pass
-			when true
-				key_parts[i] = side::sub(1, 1)
-			when "normal"
-				--error("TODO: Implement style == \"normal\" for get_box_char()")
+			when true, "normal"
 				key_parts[i] = side::sub(1, 1)
 			when "bold"
 				error("TODO: Implement style == \"bold\" for get_box_char()")
@@ -119,8 +119,118 @@ export get_box_char = (styles={}) ->
 	)])
 
 
+
+const wrap_text = (str, width) ->
+	assert(type(str)   == "string")
+	assert(type(width) == "number")
+
+	const chars = get_utf8_chars(str)
+	--require("yue").p(chars)
+
+	local index = 1
+	local display_width = 0
+	const lines = { "" }
+
+	for i, char in ipairs(chars)
+		if char == "\n"
+			index += 1
+			lines[index] = ""
+			continue
+
+		const temp = get_char_display_width(char)
+		const new_display_width = display_width + temp
+
+		if new_display_width > width
+			index += 1
+			display_width = temp
+			lines[index] = char
+		else
+			display_width = new_display_width
+			lines[index] ..= char
+
+	print("[" .. "-"::rep(width) .. "]")
+	table.concat(
+		["[" .. line .. "]" for line in *lines],
+		"\n",
+	)
+
+
+export class Table
+	new: (
+		@rows=[],
+		columns,
+	) =>
+		@columns = if columns?
+			columns
+		elseif row := @rows[1]
+			[k for k, v in pairs(row)]
+		else
+			[]
+
+	add_row: (row) =>
+		assert(type(row) == "table")
+
+		@columns ??= [k for k, v in pairs(row)]
+
+		@rows[] = row
+
+	render: (options={}) =>
+		with options
+			.width ??= do
+				const f = assert(io.popen("tput cols"))
+				const output = f::read("*a")
+				f::close()
+				assert(tonumber(output::match("%d*"))) - 1
+
+		const column_width = math.floor((options.width - 2) / #@columns)
+
+		const top, right, bottom, left = true, true, true, true
+
+		local result = ""
+
+		const hr = get_box_char({ :right, :left })::rep(column_width)
+		result ..= (
+			get_box_char({ :right, :bottom }) ..
+			table.concat(
+				[hr for i = 1, #@columns],
+				get_box_char({ :left, :bottom, :right }),
+			) ..
+			get_box_char({ :bottom, :left }) ..
+			"\n"
+		)
+
+		result ..= get_box_char({ :top, :bottom })
+
+		for i, col in ipairs(@columns)
+			col = tostring(col)
+			result ..= (
+				col ..
+				" "::rep(column_width - #col)
+			)
+
+			if i < #@columns
+				result ..= get_box_char({ :top, :bottom })
+
+		result ..= get_box_char({ :top, :bottom }) .. "\n"
+
+		--for row in *@rows
+		--	for col in *@columns
+
+		result ..= (
+			get_box_char({ :right, :top }) ..
+			get_box_char({ :right, :left })::rep(options.width - 2) ..
+			get_box_char({ :top, :left })
+		)
+
+		result
+
+
 export main = (argv=arg) ->
 	print("Hello from %q:%d"::format($FILE, $LINE))
+
+	print()
+	print(wrap_text("Hello, world! 😊 "::rep(20), 30))
+	print()
 
 	--for k, v in pairs(charset)
 	--	print(k, v)
@@ -138,6 +248,15 @@ export main = (argv=arg) ->
 	p({ :top, :bottom })
 	p({ :left, :right })
 	p({ :top, :left, :right })
+
+	print()
+
+	const test_table = Table({
+		{ x: "foo", y: "bar" },
+		{ x: "biz", y: "baz" },
+		{ x: "lua", y: "yue" },
+	})
+	print(test_table::render())
 
 
 if select("#", ...) == 0
